@@ -1,21 +1,11 @@
-// build word probabibility chart
-
-const words = require("./words.json");
-const util = require("util");
-const cp = require("child_process");
-
-const copyToClipboard = () => {
-  cp.spawn("clip").stdin.end(util.inspect("content_for_the_clipboard"));
-};
+let words = require("./words.json");
+const popularWords = require("./popularWords");
 
 const readline = require("readline");
 const rl = readline.createInterface({
   input: process.stdin,
   output: process.stdout,
 });
-rl.close();
-
-// [{a: 10, b:3}, {}]
 
 const letterPropabilityByIndex = words.reduce(
   (letterDict, word) => {
@@ -30,9 +20,7 @@ const letterPropabilityByIndex = words.reduce(
   },
   [{}, {}, {}, {}, {}]
 );
-console.log({ letterPropabilityByIndex });
 
-// {a: 10, b:3}
 const letterPropability = words.reduce((letterDict, word) => {
   [...word].forEach((letter) => {
     if (letter in letterDict) {
@@ -43,19 +31,6 @@ const letterPropability = words.reduce((letterDict, word) => {
   });
   return letterDict;
 }, {});
-console.log({ letterPropability });
-
-const wordsScoreSorted = [...words].sort((wordA, wordB) => {
-  const scoreA = [...new Set([...wordA])].reduce(
-    (total, letter) => letterPropability[letter] * total,
-    1
-  );
-  const scoreB = [...new Set([...wordB])].reduce(
-    (total, letter) => letterPropability[letter] * total,
-    1
-  );
-  return scoreB - scoreA;
-});
 
 const getWordScore = (word, log = () => {}) => {
   const score = [...word].reduce(
@@ -66,43 +41,98 @@ const getWordScore = (word, log = () => {}) => {
       (log({ total }), total),
     1
   );
-  // reduce score if duplicate letter in word
   if (isNaN(score)) {
     return 0;
   }
+  // reduce score if duplicate letter in word
   if ([...new Set([...word])].length != word.length) {
-    return Math.floor(score / 8);
+    return Math.floor(score / 10000);
   }
   return score;
 };
 
-const wordsIndexedScoreSorted = [...words].sort((wordA, wordB) => {
-  return getWordScore(wordB) - getWordScore(wordA);
-});
+let wordsIndexedScoreSorted = [];
 
-console.log(wordsIndexedScoreSorted);
+let popularScope = 8; // we check popular words out of high scored words
 
-const currentGuess = wordsIndexedScoreSorted[0];
-
-const askUser = () => {
-  rl.question(
-    "word result (u = unused, w = wrong spot, c = correct). To select a word, use  'word _____'",
-    (response) => {
-      if (response.startsWith("word ")) {
-        currentGuess = response.slice(5);
+const scoreWords = (scope) => {
+  wordsIndexedScoreSorted = [...words].sort((wordA, wordB) => {
+    return getWordScore(wordB) - getWordScore(wordA);
+  });
+  const topOfTop = wordsIndexedScoreSorted
+    .slice(0, scope)
+    .sort((wordA, wordB) => {
+      const indexA = popularWords.indexOf(wordA);
+      const indexB = popularWords.indexOf(wordB);
+      if (indexA === -1) {
+        return Infinity;
       }
+      if (indexB === -1) {
+        return -Infinity;
+      }
+      return indexA - indexB;
+    });
+  console.log("top 20 words", topOfTop);
+  return topOfTop[0];
+};
+const firstWordGuess = scoreWords(popularScope);
+
+const askUser = (currentGuess = firstWordGuess) => {
+  rl.question(
+    `word result (u = unused, w = wrong spot, c = correct).\nTo use a different guess word, type 'word _____' or 'skip'\ncurrent Guess: \n${currentGuess}\n`,
+    (response) => {
+      const isNewWord = response.startsWith("word ");
+      if (isNewWord) {
+        const newGuess = response.slice(5);
+        askUser(newGuess);
+        return;
+      }
+      const isSkip = response.startsWith("skip");
+      if (isSkip) {
+        words = words.filter((word) => word != currentGuess);
+        const newGuess = scoreWords(popularScope);
+        askUser(newGuess);
+        return;
+      }
+      const isReset = response.startsWith("reset");
+      if (isReset) {
+        words = require("./words.json");
+        popularScope = 8;
+        const newGuess = scoreWords(popularScope);
+        askUser(newGuess);
+        return;
+      }
+
+      // doing word logic
       [...currentGuess].forEach((letter, index) => {
         if (response[index] === "u") {
-          letterPropabilityByIndex[index][letter] = 0;
+          const onlyInstance =
+            currentGuess.indexOf(letter) === currentGuess.lastIndexOf(letter);
+          // if only instance, remove all usages, otherwise only remove this instance
+          if (onlyInstance) {
+            words = words.filter((word) => !word.includes(letter));
+          }
+          if (!onlyInstance) {
+            words = words.filter((word) => {
+              return word[index] != letter;
+            });
+          }
         }
         if (response[index] === "w") {
-          letterPropability[letter] = letterPropability[letter] * 5;
+          words = words.filter(
+            (word) => word[index] != letter && word.includes(letter)
+          );
         }
         if (response[index] === "c") {
-          letterPropabilityByIndex[index] = { letter: 1 };
+          words = words.filter((word) => word[index] === letter);
         }
       });
-      askUser();
+      popularScope = popularScope * 2;
+      const newGuess = scoreWords(popularScope);
+      askUser(newGuess);
+      return;
     }
   );
 };
+
+askUser();
