@@ -72,7 +72,7 @@ const scoreWords = (scope) => {
       }
       return indexA - indexB;
     });
-  console.log("top 20 words", topOfTop);
+  console.log(`top ${scope} words`, topOfTop);
   return topOfTop[0];
 };
 const firstWordGuess = scoreWords(popularScope);
