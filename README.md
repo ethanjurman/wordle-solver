@@ -21,7 +21,8 @@ word result (u = unused, w = wrong spot, c = correct).
 To use a different guess word, type 'word _____' or 'skip'
 current Guess:
 tales
-uucuc
+uucuc <- this is the user input
+
 top 16 words [
   'holds', 'golds', 'folds',
   'polis', 'milos', 'molds',
@@ -34,5 +35,4 @@ word result (u = unused, w = wrong spot, c = correct).
 To use a different guess word, type 'word _____' or 'skip'
 current Guess:
 holds
-uucuc
 ```
